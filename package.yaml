@@ -1,0 +1,13 @@
+name: adventofcode2023
+
+dependencies:
+  - base >= 4.7 && < 5
+  - unordered-containers
+  - vector
+  - heap
+  - linear
+  - parsec
+
+library:
+  source-dirs:
+    - lib

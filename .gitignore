@@ -1,0 +1,8 @@
+*~
+*#
+day*/*
+!day*/*.hs
+!day*/test*.txt
+.stack-work
+.env
+stats.json

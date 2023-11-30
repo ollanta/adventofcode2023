@@ -1,0 +1,18 @@
+resolver: lts-20.4
+
+# User packages to be built.
+# Various formats can be used as shown in the example below.
+#
+# packages:
+# - some-directory
+# - https://example.com/foo/bar/baz-0.0.2.tar.gz
+#   subdirs:
+#   - auto-update
+#   - wai
+packages:
+- .
+# Extra directories used by stack for building
+# extra-include-dirs: [/path/to/dir]
+# extra-lib-dirs: [/path/to/dir]
+# extra-deps:
+# - hip-1.5.6.0@sha256:296c55622f62485422c0a593c7306af1a5abf8ba9f866dcdffc281b01eba65d7,6988
