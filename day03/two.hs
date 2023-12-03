@@ -17,17 +17,15 @@ solve inp = unlines [
         helper coord char acc@(visited, groups)
           | not (isNumber char)      = acc
           | coord `M.member` visited = acc
-          | otherwise = (visited', newGroup':groups)
+          | otherwise = (visited', newGroup:groups)
           where
             newGroup = findGroup coord visited
             visited' = M.union visited newGroup
 
-            newGroup' = transformGroup newGroup
-
-        findGroup coord visited = helper [coord] M.empty
+        findGroup coord visited = fill [coord] M.empty
           where
-            helper [] group = group
-            helper coords group = helper coords' group'
+            fill [] group = group
+            fill coords group = fill coords' group'
               where
                 group' = M.union group $ M.fromList [(c, chart M.! c) | c <- coords]
                 coords' = [nc | c <- coords,
@@ -38,19 +36,19 @@ solve inp = unlines [
                                 chart M.! nc /= '.'
                           ]
 
-        transformGroup group
-          | length numbers == 2 && symbols == "*" = numbers
-          | otherwise = []
-          where
-            numbers = findNumbers . showMC . M.filter isNumber $ group
-            symbols = filter (not . isNumber) . M.elems $ group
+    (_, groups) = separateGroups $ M.filter isNumber chart
+
+    transformGroup group = (numbers, symbols)
+      where
+        numbers = findNumbers . showMC . M.filter isNumber $ group
+        symbols = filter (not . isNumber) . M.elems $ group
 
     findNumbers "" = []
     findNumbers s@(c:cs)
       | isNumber c = (read $ takeWhile isNumber s) : findNumbers (dropWhile isNumber s)
       | otherwise  = findNumbers cs
 
-    (_, groups) = separateGroups $ M.filter isNumber chart
-
-    answer = sum [product group | group <- groups, not (null group)]
-    
+    answer = sum [product numbers
+                  | (numbers, symbols) <- map transformGroup groups,
+                    length numbers == 2,
+                    symbols == "*"]
