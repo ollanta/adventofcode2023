@@ -7,22 +7,20 @@ main :: IO ()
 main = optimisticInteract readD solve
 
 readD :: Parser (String, [(String, (String, String))])
-readD = readAll
-  where
-    readAll = do
-      rl <- word
-      many1 newline
-      nodes <- readNode `sepEndBy` newline
-      return (rl, nodes)
-
-    readNode = do
-      node <- word
-      string " = ("
-      left <- many1 letter
-      string ", "
-      right <- many1 letter
-      string ")"
-      return (node, (left, right))
+readD = do
+  rl <- word
+  many1 newline
+  nodes <- readNode `sepEndBy` newline
+  return (rl, nodes)
+    where
+      readNode = do
+        node <- word
+        string " = ("
+        left <- many1 letter
+        string ", "
+        right <- many1 letter
+        string ")"
+        return (node, (left, right))
 
 
 solve (directions, graphAsList) = unlines [

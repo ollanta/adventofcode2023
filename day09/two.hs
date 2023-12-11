@@ -7,16 +7,7 @@ main :: IO ()
 main = optimisticInteract readD solve
 
 readD :: Parser [[Integer]]
-readD = readAll
-  where
-    readAll = do
-      lines <- readLine `sepBy` newline
-      return lines
-
-    readLine = do
-      numbers <- mnumber `sepBy` char ' '
-      return numbers
-
+readD = (mnumber `sepBy1` char ' ') `sepEndBy` newline
 
 solve lines = unlines [
   show $ lines
