@@ -1,8 +1,7 @@
-import Data.Char
 import Text.Parsec
 import Parsing
-import qualified Data.HashMap.Strict as M
-import Chart2d
+import Generic
+import qualified Data.HashMap.Lazy as L
 import Data.List
 
 main :: IO ()
@@ -23,35 +22,29 @@ solve input = unlines [
   , show $ answer
   ]
   where
-    arrlist = map (fst . arrs) $ map (\(springs, groups) -> (tail . concat $ replicate 5 ('?':springs), concat $ replicate 5 groups)) input
+    longerInput = [(intercalate "?" $ replicate 5 springs, concat $ replicate 5 groups) | (springs, groups) <- input]
+    arrlist = map arrs longerInput
     answer = sum arrlist
 
-    arrs (springs, groups) = helper M.empty springs (map fromInteger groups)
+    arrs (springs, groups) = mhelper springs groups
       where
-        helper :: M.HashMap ([Char],[Int]) Integer -> [Char] -> [Int] -> (Integer, M.HashMap ([Char],[Int]) Integer)
-        helper mem sprs gs
-          | (sprs,gs) `M.member` mem = (mem M.! (sprs,gs), mem)
-          | sum gs > length (filter (/='.') sprs) = (0, mem)
-        helper mem ('.':ss) gs = helper mem ss gs
-        helper mem sprs@('#':ss) (g:gs)
-          | subarr sprs g = (val, mem'')
-          | otherwise     = (0, M.insert (sprs, g:gs) 0 mem)
+        mhelper sprs grps = memo L.! (sprs, grps)
           where
-            (val, mem') = helper mem (drop g ss) gs
-            mem'' = M.insert (sprs, g:gs) val mem'
-        helper mem ('#':ss) [] = (0, mem)
-        helper mem sprs@('?':ss) (g:gs)
-          | subarr sprs g = (ifSkip + notSkip, mem''')
-          | otherwise     = (ifSkip, M.insert (sprs, g:gs) ifSkip mem')
-          where
-            (ifSkip, mem') = helper mem ss (g:gs)
-            (notSkip, mem'') = helper mem' (drop g ss) gs
-            mem''' = M.insert (sprs, g:gs) (ifSkip + notSkip) mem''
-        helper mem ('?':ss) [] = helper mem ss []
-        helper mem [] (g:gs) = (0, mem)
-        helper mem [] [] = (1, mem)
+            memo = L.fromList [((sprs, grps), helper sprs grps) | sprs <- tails springs, grps <- tails groups]
 
-    subarr s g = length possible >= g && (length s == g || next /= '#')
+        helper ('.':ss) gs = mhelper ss gs
+        helper [] (g:_) = 0
+        helper sprs []
+          | all (`elem` ".?") sprs = 1
+          | otherwise              = 0
+        helper sprs@(s:ss) grps@(g:gs)
+          | cangroup sprs g = ifSkip + mhelper (dropN g ss) gs
+          | otherwise       = ifSkip
+          where
+            ifSkip = if s == '#' then 0 else mhelper ss grps
+
+    cangroup s g = lengthN possible >= g && next /= '#'
       where
         possible = takeWhile (`elem` "?#") s
-        next = head . drop g $ s
+        next = head . dropN g $ s ++ "."
+

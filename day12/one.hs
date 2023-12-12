@@ -1,9 +1,6 @@
-import Data.Char
 import Text.Parsec
 import Parsing
-import qualified Data.HashMap.Strict as M
-import Chart2d
-import Data.List
+import Generic
 
 main :: IO ()
 main = optimisticInteract readD solve
@@ -25,30 +22,20 @@ solve input = unlines [
   where
     answer = sum . map arrs $ input
 
-    arrs (springs, groups) = helper springs (map fromInteger groups)
+    arrs (springs, groups) = helper springs groups
       where
         helper ('.':ss) gs = helper ss gs
-        helper sprs@('#':ss) (g:gs)
-          | subarr sprs g = helper (drop g ss) gs
-          | otherwise     = 0
-        helper ('#':ss) [] = 0
-        helper sprs@('?':ss) (g:gs)
-          | subarr sprs g = ifSkip + helper (drop g ss) gs
-          | otherwise     = ifSkip
+        helper [] (g:_)  = 0
+        helper sprs []
+          | all (`elem` ".?") sprs = 1
+          | otherwise              = 0
+        helper sprs@(s:ss) grps@(g:gs)
+          | cangroup sprs g = ifSkip + helper (dropN g ss) gs
+          | otherwise       = ifSkip
           where
-            ifSkip = helper ss (g:gs)
-        helper ('?':ss) [] = helper ss []
-        helper [] (g:gs) = 0
-        helper [] [] = 1
+            ifSkip = if s == '#' then 0 else helper ss grps
 
-    subarr s g = length possible >= g && (length s == g || next /= '#')
+    cangroup s g = lengthN possible >= g && next /= '#'
       where
         possible = takeWhile (`elem` "?#") s
-        next = head . drop g $ s
-        {-}
-    subarr ('.':cs) g = g <= 0
-    subarr []       g = g <= 0
-    subarr ('?':c:cs) 0 = c /= '#'
-    subarr ('#':cs) g = subarr cs (g-1)
-    subarr ('?':cs) g = subarr cs (g-1)
-    -}
+        next = head . dropN g $ s ++ "."
