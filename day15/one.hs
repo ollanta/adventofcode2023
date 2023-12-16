@@ -1,10 +1,6 @@
 import Text.Parsec
 import Parsing
-import Generic
-import Data.List
-import Chart2d
 import Data.Char
-import qualified Data.HashMap.Strict as M
 
 main :: IO ()
 main = optimisticInteract readD solve
@@ -19,13 +15,13 @@ readD = readStep `sepBy` char ','
 
 solve input = unlines [
   show $ input
-  , show $ map algo input
+  , show $ map hash input
   , show $ answer
   ]
   where
-    answer = sum $ map algo input
+    answer = sum $ map hash input
 
-    algo str = hash 0 str
+    hash str = hash' 0 str
       where
-        hash v (c:cs) = hash ((v + ord c) * 17 `rem` 256) cs
-        hash v [] = v
+        hash' v (c:cs) = hash' ((v + ord c) * 17 `rem` 256) cs
+        hash' v [] = v

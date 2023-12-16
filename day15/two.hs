@@ -1,65 +1,51 @@
 import Text.Parsec
 import Parsing
-import Generic
-import Data.List
-import Chart2d
 import Data.Char
 import qualified Data.HashMap.Strict as M
 
 main :: IO ()
 main = optimisticInteract readD solve
 
-readD :: Parser [String]
+readD :: Parser [(String, Maybe Int)]
 readD = readStep `sepBy` char ','
   where
     readStep = do
       many newline
-      s <- many1 $ noneOf ",\n"
-      many newline
-      return s
+      s <- many1 alphaNum
+      c <- choice [readEq, readMin]
+      return (s, c)
+
+    readEq = (Just . fromInteger) <$> (char '=' >> number)
+    readMin = char '-' >> pure Nothing
 
 solve input = unlines [
   show $ input
-  , show $ M.toList . M.filter (not . null) $ algo input
   , show $ answer
   ]
   where
-    answer = sum . map score $ end
+    answer = sum . map score . M.toList . M.map scoreContent $ algo input
       where
-        score (box, l) = (1+box) * sum (zipWith (*) [1..] (map snd l))
+        scoreContent c = sum . zipWith (*) [1..] $ map snd c
+        score (box, contentScore) = (1+box) * contentScore
 
-    end = M.toList . M.filter (not . null) $ algo input
-
-    algo instrs = helper (M.fromList $ zip [0..255] (repeat [])) instrs
+    hash str = foldl updateHash 0 str
       where
-        helper m (i:is) = helper m' is
+        updateHash v c = (v + ord c) * 17 `rem` 256
+
+    algo instrs = helper startState instrs
+      where
+        startState = (M.fromList $ zip [0..255] (repeat []))
+
+        helper m ((label,op):is) = helper m' is
           where
-            (box, op) = getBox 0 i
-            label = getLabel i
-            m' = case op of
-              Just fl ->  eqal m label fl box
-              Nothing -> dash m label box
+            box = hash label
+            m' = M.adjust (updateBox label op) box m
         helper m [] = m
 
-        dash m l box = M.insert box content' m
+        updateBox l (Just fl) content = insertLens content
           where
-            content = m M.! box
-            content' = filter ((/=l) . fst) content
-
-        eqal m l fl box = M.insert box content' m
-          where
-            content = m M.! box
-            content' = insertLens content
-
             insertLens ((ol, ofl):cs)
-              | l == ol = (l, fl):cs
+              | l == ol   = (l, fl):cs
               | otherwise = (ol, ofl):insertLens cs
             insertLens [] = [(l,fl)]
-
-        getLabel i = takeWhile (not . (`elem` "=-")) i
-
-        getBox :: Int -> String -> (Int, Maybe Int)
-        getBox v (c:cs)
-          | c == '=' = (v, Just $ read cs)
-          | c == '-' = (v, Nothing)
-          | otherwise = getBox ((v + ord c) * 17 `rem` 256) cs
+        updateBox l Nothing content = filter ((/=l) . fst) content
