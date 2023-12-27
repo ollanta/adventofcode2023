@@ -14,48 +14,57 @@ readD = readLine `sepEndBy` newline
       outs <- word `sepBy` string ", "
       return (name, outs)
 
-
 solve input = unlines [
   show $ filter (/="broadcaster") . sort $ M.keys inmodules
-  , show $ sort . nub . concat . map snd $ M.elems inmodules
-  , show $ answer
+  , show $ snd finalState
+  , show answer
   ]
   where
-    answer = head . drop 1000 $ broadcast inmodules
-
-    inmodules = M.fromList (map niceify input)
+    answer = highs * lows
       where
-        niceify ('%':s, outs) = (s, ('%', outs))
-        niceify ('&':s, outs) = (s, ('&', outs))
-        niceify (s, outs) = (s, ('b', outs))
+        (_, (highs, lows)) = finalState
 
-    broadcast modules = iterate (\(ff, cn, h, l) -> helper ff cn h (l+1) [(0, "", "broadcaster", modules M.! "broadcaster")]) (flipflop, conjunction, 0, 0)
+    finalState = iterateBroadcast inmodules !! 1000
+
+    inmodules = M.fromList $ map parseModule input
       where
+        parseModule ('%':s, outs) = (s, ('%', outs))
+        parseModule ('&':s, outs) = (s, ('&', outs))
+        parseModule (s, outs)     = (s, ('b', outs))
+
+    iterateBroadcast modules = iterate (\(state, counts) -> broadcastAll state counts initialSignal) initialState
+      where
+        initialSignal = [(0, "", "broadcaster")]
+        initialState = ((flipflop, conjunction), (0, 0))
         flipflop = M.map (const 0) $ M.filter ((=='%') . fst) modules
         conjunction = M.mapWithKey ins $ M.filter ((=='&') . fst) modules
           where
-            ins name _ = M.map (const 0) $ M.filter ((name `elem`) . snd) modules 
+            ins name _ = M.map (const 0) $ M.filter ((name `elem`) . snd) modules
 
-        helper ff cn h l ((pulse, prev, this, ('%',outs)):ms)
-          | pulse == 1 = helper ff cn h l ms
-          | otherwise  = helper ff' cn (h+k*pulse') (l+k*(1-pulse')) ms'
+        broadcastAll state counts (signal:signals) = broadcastAll state' counts' (signals ++ moreSignals)
+          where
+            (state', moreSignals) = broadcast state signal
+            counts' = updateCount counts signal
+        broadcastAll state counts [] = (state, counts)
+
+        updateCount (highs, lows) (pulse, _, _) = (highs+pulse, lows+1-pulse)
+
+        broadcast state (pulse, prev, from)
+          | modules M.!? from == Nothing = (state, [])
+          | newPulse == Nothing          = (state, [])
+          | otherwise                    = (state', [(pulse', from, out) | out <- outs])
+          where
+            (mtype, outs) = modules M.! from
+            newPulse = runPulse state prev from mtype pulse
+            Just (state', pulse') = newPulse
+
+        runPulse state    prev this 'b' pulse = Just (state, pulse)
+        runPulse state    prev this '%' 1     = Nothing
+        runPulse (ff, cn) prev this '%' 0     = Just ((ff', cn), pulse')
           where
             pulse' = 1 - ff M.! this
             ff' = M.insert this pulse' ff
-            ms' = ms ++ [(pulse', this, out, modules M.! out) | out <- outs]
-            k = length outs
-        helper ff cn h l ((pulse, prev, this, ('&',outs)):ms)
-          | otherwise = helper ff cn' (h+k*pulse') (l+k*(1-pulse')) ms'
+        runPulse (ff, cn) prev this '&' pulse = Just ((ff, cn'), pulse')
           where
-            thiscn = cn M.! this
-            thiscn' = M.insert prev pulse thiscn
-            cn' = M.insert this thiscn' cn
-            pulse' = if all (==1) (M.elems thiscn') then 0 else 1
-            ms' = ms ++ [(pulse', this, out, modules M.! out) | out <- outs, M.member out modules]
-            k = length outs
-        helper ff cn h l ((pulse, prev, this, ('b',outs)):ms)
-          | otherwise = helper ff cn (h+k*pulse) (l+k*(1-pulse)) ms'
-          where
-            ms' = ms ++ [(pulse, this, out, modules M.! out) | out <- outs]
-            k = length outs
-        helper ff cn h l [] = (ff, cn, h, l)
+            cn' = M.adjust (M.insert prev pulse) this cn
+            pulse' = if all (==1) (M.elems $ cn' M.! this) then 0 else 1
