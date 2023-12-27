@@ -28,38 +28,40 @@ solve input = unlines [
   , show $ answer
   ]
   where
-    answer = sum . map ((\k -> k-1) . length . falls) $ M.keys inpM
+    answer = sum . map (length . falls . fst) $ keyedInput
       where
-        inp' = zip ([1..] :: [Integer]) input
-        inpM = M.fromList inp'
-        stack = run inp'
+        keyedInput = zip [1..] input
+        stack = run keyedInput
 
-        falls ci = falls' (M.filterWithKey (\k v -> k /= ci) restsOnM) [ci]
+        falls ci = falls' restsOnM [ci]
           where
             falls' m [] = []
-            falls' m cs = cs ++ falls' m'' cs'
+            falls' m cs = cs' ++ falls' m'' cs'
               where
                 m' = M.map (filter (not . (`elem` cs))) m
-                cs' = M.keys $ M.filter null m'
-                m'' = M.difference m' . M.fromList $ zip cs' (repeat [])
+                m'' = M.filter (not . null) m'
+                cs' = M.keys $ M.difference m' m''
 
-            restsOnM = M.fromList [(c, restsOn c) | c <- M.keys inpM]
-            restsOn c = nub . filter (/=c) $ concat [map fst . filter ((==z-1) . snd) $ stack M.! (x,y) | let ((x1,y1,_),(x2,y2,_)) = inpM M.! c, x <- [x1..x2], y <- [y1..y2], let (_,z) = minimum . filter ((==c) . fst) $ stack M.! (x,y)]
+            restsOnM = M.map nub $ M.fromListWith (++) [(a, [b]) | xystack <- M.elems stack, (a, b) <- restsOnInStack xystack]
+            restsOnInStack xystack = [(n2, n1) | ((n1, z1), (n2, z2)) <- zip sortedStack (tail sortedStack), n1 /= n2, z1+1 == z2]
+              where
+                sortedStack = sortOn snd $ filter ((/=0) . fst) xystack
 
-    run :: [(Integer, ((Integer, Integer, Integer), (Integer, Integer, Integer)))] -> M.HashMap (Integer, Integer) [(Integer, Integer)]
-    run inp = helper initSettled inp
+    run :: [(Int, ((Integer, Integer, Integer), (Integer, Integer, Integer)))] -> M.HashMap (Integer, Integer) [(Int, Integer)]
+    run inp = settleBricks initSettled inp
       where
         xycoords = [(x,y) | (_,((x1,y1,_), (x2,y2,_)))  <- inp, x <- [x1..x2], y <- [y1..y2]]
-        (minX, minY) = minimum xycoords
-        (maxX, maxY) = maximum xycoords
-        initSettled = M.fromList [((x,y),[(0,0)]) | x <- [minX..maxX], y <- [minY..maxY]]
+        initSettled = M.fromList $ zip xycoords (repeat [(0,0)])
 
-        mindrop settled brick = minimum [z1 - maximum (filter (<z1) . map snd $ settled M.! (x,y)) | let (_, ((x1,y1,z1), (x2,y2,_))) = brick, x <- [x1..x2], y <- [y1..y2]]
+        mindrop settled brick = z1 - maximum settledBelow
+          where
+            (_, ((x1, y1, z1), (x2, y2, _))) = brick
+            settledBelow = [z | x <- [x1..x2], y <- [y1..y2], let xystack = settled M.! (x,y), (_, z) <- xystack, z < z1]
 
-        helper settled [] = settled
-        helper settled bricks
-          | null toSettle = helper settled' rest'
-          | otherwise     = helper settled' rest
+        settleBricks settled [] = settled
+        settleBricks settled bricks
+          | null toSettle = settleBricks settled' rest'
+          | otherwise     = settleBricks settled' rest
           where
             (toSettle, rest) = partition ((==1) . (mindrop settled)) $ bricks
             settled' = M.unionWith (++) settled $ M.fromListWith (++) [((x,y), [(name, bz)]) | (name, ((x1,y1,z1), (x2,y2,z2))) <- toSettle, x <- [x1..x2], y <- [y1..y2], bz <- nub [z1, z2]]
